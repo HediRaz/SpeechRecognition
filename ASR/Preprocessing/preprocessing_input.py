@@ -42,7 +42,7 @@ if __name__ == "__main__":
     print(list_file)
     for file in list_file[:-1]:
         plt.figure()
-        stfts = transform_pipline(r"LibriSpeech\dev-clean\84\121123\\" + file, False)
-        print(stfts.shape)
-        plt.imshow(stfts)
+        mel_specgram = mel_pipeline(r"LibriSpeech\dev-clean\84\121123\\" + file, 25, 20,False)
+        print(mel_specgram.shape)
+        plt.imshow(mel_specgram)
     plt.show()
