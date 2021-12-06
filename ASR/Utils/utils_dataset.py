@@ -214,6 +214,15 @@ def load_all_dataset(ds_folder):
     return all_audio, all_label
 
 
+def get_label_length(label):
+    c = 0
+    i = -1
+    while label[i] == 0:
+        c += 1
+        i -= 1
+    return c
+
+
 class SoundDataset(Dataset):
 
     def __init__(self, ds_folder):
@@ -221,12 +230,13 @@ class SoundDataset(Dataset):
         ds_folder = os.path.normpath(ds_folder)
         self.ds_folder = ds_folder
         self.all_audio, self.all_label = load_all_dataset(ds_folder)
+        self.all_label_lengths = torch.tensor([get_label_length(label) for label in self.all_label], dtype=torch.long, device=device)
 
     def __len__(self):
         return self.all_label.shape[0]
 
     def __getitem__(self, idx):
-        return self.all_audio[idx], self.all_label[idx]
+        return self.all_audio[idx], self.all_label[idx], self.all_label_lengths[idx]
 
 
 def create_dataloaders(ds, batch_size=16, split=0.8):
@@ -244,3 +254,8 @@ def create_dataloaders(ds, batch_size=16, split=0.8):
 if __name__ == "__main__":
     ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
     train_dl, test_dl = create_dataloaders(ds)
+    x = next(train_dl._get_iterator())
+    print(x)
+    print(x[0].shape)
+    print(x[1].shape)
+    print(x[2].shape)
