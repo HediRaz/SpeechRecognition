@@ -7,14 +7,15 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     model.train()
-    for batch, (X, y, z) in enumerate(dataloader):
-        X, y, z = X.to(device), y.to(device), z.to(device)
+    for batch, (X, y, xs, ys) in enumerate(dataloader):
+        X, y = X.to(device), y.to(device)
+        xs, ys = xs.to(device), ys.to(device)
 
         # Compute prediction error
         pred = model(X)
         pred = torch.transpose(pred, 0, -1)
         pred = torch.transpose(pred, 1, -1)
-        loss = loss_fn(pred, y, z*2, z)
+        loss = loss_fn(pred, y, xs-10, ys)
 
         # Backpropagation
         optimizer.zero_grad()

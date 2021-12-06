@@ -199,6 +199,10 @@ def load_all_dataset(ds_folder):
     all_audio = [torch.load(path[0]) for path in all_paths]
     all_label = [torch.tensor(np.load(path[1]), dtype=torch.int64) for path in all_paths]
 
+    # Get data size
+    all_audio_size = torch.tensor([l.size(-1) for l in all_audio], dtype=torch.long, device=device)
+    all_label_size = torch.tensor([l.size(0) for l in all_label], dtype=torch.long, device=device)
+
     # Pad data
     max_shape_audio = max(all_audio, key=lambda x: x.shape[1]).shape[1]
     max_shape_label = max(all_label, key=lambda x: x.shape[0]).shape[0]
@@ -211,16 +215,7 @@ def load_all_dataset(ds_folder):
     all_audio = all_audio.to(device)
     all_label = all_label.to(device)
 
-    return all_audio, all_label
-
-
-def get_label_length(label):
-    c = 0
-    i = -1
-    while label[i] == 0:
-        c += 1
-        i -= 1
-    return c
+    return all_audio, all_label, all_audio_size, all_label_size
 
 
 class SoundDataset(Dataset):
@@ -229,14 +224,13 @@ class SoundDataset(Dataset):
         super().__init__()
         ds_folder = os.path.normpath(ds_folder)
         self.ds_folder = ds_folder
-        self.all_audio, self.all_label = load_all_dataset(ds_folder)
-        self.all_label_lengths = torch.tensor([get_label_length(label) for label in self.all_label], dtype=torch.long, device=device)
+        self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
 
     def __len__(self):
         return self.all_label.shape[0]
 
     def __getitem__(self, idx):
-        return self.all_audio[idx], self.all_label[idx], self.all_label_lengths[idx]
+        return self.all_audio[idx], self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
 
 
 def create_dataloaders(ds, batch_size=16, split=0.8):
