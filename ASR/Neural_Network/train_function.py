@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -13,9 +14,9 @@ def train(dataloader, model, loss_fn, optimizer):
 
         # Compute prediction error
         pred = model(X)
-        pred = torch.transpose(pred, 0, -1)
-        pred = torch.transpose(pred, 1, -1)
-        loss = loss_fn(pred, y, xs-10, ys)
+        pred = F.log_softmax(pred, -1)
+        pred = torch.transpose(pred, 0, 1)
+        loss = loss_fn(pred, y, xs-12, ys)
 
         # Backpropagation
         optimizer.zero_grad()

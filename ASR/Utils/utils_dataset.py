@@ -2,6 +2,7 @@ import os
 import torch
 import torchaudio
 import torchaudio.functional as F
+import torchaudio.transforms as T
 from torch.nn.functional import pad
 from torch.utils.data import Dataset, DataLoader, random_split
 import numpy as np
@@ -226,11 +227,22 @@ class SoundDataset(Dataset):
         self.ds_folder = ds_folder
         self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
 
+        self.training = False
+        self.freq_masking = T.FrequencyMasking(20)
+        self.time_masking = T.TimeMasking(20)
+        self.time_stretch = T.TimeStretch()
+
     def __len__(self):
         return self.all_label.shape[0]
 
     def __getitem__(self, idx):
-        return self.all_audio[idx], self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
+        audio = self.all_audio[idx]
+        if self.training:
+            audio = self.freq_masking(audio)
+            audio = self.time_masking(audio)
+            rate = np.random.uniform(.9, 1.1)
+            audio = self.time_masking(audio, rate)
+        return audio, self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
 
 
 def create_dataloaders(ds, batch_size=16, split=0.8):
@@ -239,6 +251,7 @@ def create_dataloaders(ds, batch_size=16, split=0.8):
     train_ds, val_ds = random_split(ds, [n_train, n - n_train])
 
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    train_dl.training = True
     val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=True)
 
     return train_dl, val_dl

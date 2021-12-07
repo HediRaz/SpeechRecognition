@@ -78,3 +78,78 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 myModel = myModel.to(device)
 # Check that it is on Cuda
 next(myModel.parameters()).device
+
+class MobileBlock(nn.Module):
+
+    def __init__(self, n):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(n, 2*n, 1, 1),
+            nn.BatchNorm2d(2*n),
+            nn.GELU(),
+            nn.Conv2d(2*n, 2*n, 3, 1, 1, 1, 2*n),
+            nn.BatchNorm2d(2*n),
+            nn.GELU(),
+            nn.Conv2d(2*n, n, 1, 1),
+            nn.BatchNorm2d(n),
+        )    
+    
+    def forward(self, x):
+        return self.model(x) + x
+
+
+class Spec2Seq(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.conv_layers = nn.Sequential(
+            # N x 1 x 128 x T
+            nn.Conv2d(1, 8, 5, (1, 1)),
+            # N x 8 x 124 x (T-4)
+            nn.GELU(),
+            MobileBlock(8),
+            MobileBlock(8),
+            MobileBlock(8),
+            nn.Conv2d(8, 16, 3, (2, 1)),
+            # N x 16 x 61 x (T-6)
+            nn.GELU(),
+            MobileBlock(16),
+            MobileBlock(16),
+            MobileBlock(16),
+            nn.Conv2d(16, 32, 3, (2, 1)),
+            # N x 32 x 29 x (T-8)
+            nn.GELU(),
+            MobileBlock(32),
+            MobileBlock(32),
+            MobileBlock(32),
+            nn.Conv2d(32, 64, 3, (2, 1)),
+            # N x 64 x 13 x (T-10)
+            nn.GELU(),
+            MobileBlock(64),
+            MobileBlock(64),
+            MobileBlock(64),
+            nn.Conv2d(64, 128, 3, (2, 1)),
+            # N x 128 x 5 x (T-12)
+            nn.GELU(),
+            MobileBlock(128),
+            MobileBlock(128),
+            nn.MaxPool2d((5, 1), (5, 1))
+        )
+
+        self.lstm = nn.GRU(input_size=128, output_size=128, batch_first=True, bidirectional=True, num_layers=4)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(2*128, 128),
+            nn.GELU(),
+            nn.Linear(128, 128)
+        )
+
+    
+    def forward(self, x):
+        x = torch.unsqueeze(x, 1)
+        x = self.conv_layers(x)
+        x = torch.squeeze(x, 2)
+        x = torch.transpose(x, 1, 2)
+        x = self.lstm(x)
+        x = self.classifier(x)
+        return x
