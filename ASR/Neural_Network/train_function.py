@@ -16,7 +16,7 @@ def train(dataloader, model, loss_fn, optimizer):
         pred = model(X)
         pred = F.log_softmax(pred, -1)
         pred = torch.transpose(pred, 0, 1)
-        loss = loss_fn(pred, y, xs-12, ys)
+        loss = loss_fn(pred, y, xs-13, ys)
 
         # Backpropagation
         optimizer.zero_grad()

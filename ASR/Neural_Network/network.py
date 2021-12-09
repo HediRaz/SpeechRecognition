@@ -84,6 +84,8 @@ class MobileBlock(nn.Module):
     def __init__(self, n):
         super().__init__()
         self.model = nn.Sequential(
+            nn.BatchNorm2d(n),
+            nn.GELU(),
             nn.Conv2d(n, 2*n, 1, 1),
             nn.BatchNorm2d(2*n),
             nn.GELU(),
@@ -91,7 +93,6 @@ class MobileBlock(nn.Module):
             nn.BatchNorm2d(2*n),
             nn.GELU(),
             nn.Conv2d(2*n, n, 1, 1),
-            nn.BatchNorm2d(n),
         )    
     
     def forward(self, x):
@@ -103,53 +104,58 @@ class Spec2Seq(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv_layers = nn.Sequential(
-            # N x 1 x 128 x T
+            # N x 1 x T x 128
             nn.Conv2d(1, 8, 5, (1, 1)),
-            # N x 8 x 124 x (T-4)
-            nn.GELU(),
-            MobileBlock(8),
-            MobileBlock(8),
+            # N x 16 x (T-4) x 124
+            # MobileBlock(8),
+            # MobileBlock(8),
             MobileBlock(8),
             nn.Conv2d(8, 16, 3, (2, 1)),
-            # N x 16 x 61 x (T-6)
-            nn.GELU(),
-            MobileBlock(16),
-            MobileBlock(16),
+            # N x 16 x (T-6) x 61
+            # nn.GELU(),
+            # MobileBlock(16),
+            # MobileBlock(16),
             MobileBlock(16),
             nn.Conv2d(16, 32, 3, (2, 1)),
-            # N x 32 x 29 x (T-8)
+            # N x 32 x (T-8) x 30
             nn.GELU(),
-            MobileBlock(32),
-            MobileBlock(32),
-            MobileBlock(32),
-            nn.Conv2d(32, 64, 3, (2, 1)),
-            # N x 64 x 13 x (T-10)
-            nn.GELU(),
-            MobileBlock(64),
-            MobileBlock(64),
-            MobileBlock(64),
-            nn.Conv2d(64, 128, 3, (2, 1)),
-            # N x 128 x 5 x (T-12)
-            nn.GELU(),
-            MobileBlock(128),
-            MobileBlock(128),
-            nn.MaxPool2d((5, 1), (5, 1))
+            # MobileBlock(32),
+            # MobileBlock(32),
+            # MobileBlock(32),
+            # nn.Conv2d(32, 64, 3, (2, 1)),
+            # N x 64 x (T-10) x 14
+            # nn.ReLU(),
+            # MobileBlock(64),
+            # MobileBlock(64),
+            # MobileBlock(64),
+            # nn.Conv2d(64, 128, 3, (2, 1)),
+            # N x 128 x (T-12) x 6
+            # nn.ReLU(),
+            # MobileBlock(128),
+            # MobileBlock(128),
+            # nn.MaxPool2d((6, 1), (6, 1))
         )
 
-        self.lstm = nn.GRU(input_size=128, output_size=128, batch_first=True, bidirectional=True, num_layers=4)
+        self.mlp = nn.Sequential(
+            nn.Linear(32*30, 256),
+            nn.GELU(),
+            nn.Linear(256, 128),
+            nn.GELU()
+        )
+        self.lstm = nn.GRU(input_size=128, hidden_size=128, batch_first=True, bidirectional=True, num_layers=1)
 
         self.classifier = nn.Sequential(
-            nn.Linear(2*128, 128),
+            nn.Linear(128, 128),
             nn.GELU(),
-            nn.Linear(128, 128)
+            nn.Linear(128, 45)
         )
 
     
     def forward(self, x):
-        x = torch.unsqueeze(x, 1)
         x = self.conv_layers(x)
-        x = torch.squeeze(x, 2)
+        x = x.view(x.size(0), x.size(1)*x.size(2), x.size(3))
         x = torch.transpose(x, 1, 2)
-        x = self.lstm(x)
+        x = self.mlp(x)
+        # x, _ = self.lstm(x)
         x = self.classifier(x)
         return x

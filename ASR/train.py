@@ -12,9 +12,9 @@ print(f"Working on {device}")
 # model = AudioClassifier().to(device)
 model = Spec2Seq().to(device)
 
-EPOCHS = 10
+EPOCHS = 1
 BATCH_SIZE = 16
-loss_fn = CTCLoss()
+loss_fn = CTCLoss(blank=44).to(device)
 optimizer = AdamW(model.parameters(), 1e-3)
 
 ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
@@ -33,22 +33,23 @@ if __name__ == "__main__":
     from Utils.utils_dataset import int_list_to_ipa
 
 
-    audio = torch.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-audio.pt")
+    audio = torch.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0001-audio.pt")
     audio = torch.unsqueeze(audio, 0)
     model.eval()
     model = model.to("cpu")
     with torch.no_grad():
         pred = model(audio)
+        print(pred.shape)
         pred = torch.softmax(pred, -1)
         pred = torch.argmax(pred, -1)
         pred = torch.squeeze(pred)
-        pred = torch.unique_consecutive(pred, dim=-1)
+        pred = torch.unique_consecutive(pred, dim=0)
         # pred = [i for i in pred if i != 0]
         pred = pred.numpy()
         print(pred)
     pred = int_list_to_ipa(pred)
     print(pred)
 
-    label = np.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-label.npy")
+    label = np.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0001-label.npy")
     print(label)
     print(int_list_to_ipa(label))

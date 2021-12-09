@@ -201,20 +201,22 @@ def load_all_dataset(ds_folder):
     all_label = [torch.tensor(np.load(path[1]), dtype=torch.int64) for path in all_paths]
 
     # Get data size
-    all_audio_size = torch.tensor([l.size(-1) for l in all_audio], dtype=torch.long, device=device)
-    all_label_size = torch.tensor([l.size(0) for l in all_label], dtype=torch.long, device=device)
+    all_audio_size = torch.tensor([l.size(-1) for l in all_audio], dtype=torch.long, device="cpu")
+    all_label_size = torch.tensor([l.size(0) for l in all_label], dtype=torch.long, device="cpu")
 
     # Pad data
     max_shape_audio = max(all_audio, key=lambda x: x.shape[1]).shape[1]
     max_shape_label = max(all_label, key=lambda x: x.shape[0]).shape[0]
-    all_audio = [pad_spectogram(a, max_shape_audio) for a in all_audio]
-    all_label = [pad_label(a, max_shape_label) for a in all_label]
+    all_audio = [pad_spectogram(a, max_shape_audio) for a in all_audio]  # torch.nn.utils.rnn.pad_sequence(all_audio, batch_first=True).transpose(1, 2)  # [pad_spectogram(a, max_shape_audio) for a in all_audio]
+    all_label = [pad_label(a, max_shape_label) for a in all_label]  # torch.nn.utils.rnn.pad_sequence(all_label, batch_first=True, padding_value=0)  # [pad_label(a, max_shape_label) for a in all_label]
+    # print(all_audio)
+    # print(all_label)
 
     # Create tensor
-    all_audio = torch.stack(all_audio, 0)
+    all_audio = torch.stack(all_audio, 0).unsqueeze(1)
     all_label = torch.stack(all_label, 0)
-    all_audio = all_audio.to(device)
-    all_label = all_label.to(device)
+    all_audio = all_audio.to("cpu")
+    all_label = all_label.to("cpu")
 
     return all_audio, all_label, all_audio_size, all_label_size
 
@@ -228,8 +230,8 @@ class SoundDataset(Dataset):
         self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
 
         self.training = False
-        self.freq_masking = T.FrequencyMasking(20)
-        self.time_masking = T.TimeMasking(20)
+        self.freq_masking = T.FrequencyMasking(15)
+        self.time_masking = T.TimeMasking(35)
         self.time_stretch = T.TimeStretch()
 
     def __len__(self):
@@ -262,7 +264,6 @@ if __name__ == "__main__":
     ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
     train_dl, test_dl = create_dataloaders(ds)
     x = next(train_dl._get_iterator())
-    print(x)
     print(x[0].shape)
     print(x[1].shape)
     print(x[2].shape)
