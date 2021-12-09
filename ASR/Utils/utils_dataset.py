@@ -252,8 +252,8 @@ def create_dataloaders(ds, batch_size=16, split=0.8):
     n_train = int(split * n)
     train_ds, val_ds = random_split(ds, [n_train, n - n_train])
 
+    train_ds.training = True
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    train_dl.training = True
     val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=True)
 
     return train_dl, val_dl

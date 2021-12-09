@@ -1,6 +1,7 @@
 from Neural_Network.network import AudioClassifier, Spec2Seq
 from Neural_Network.train_function import train, test
 from Utils.utils_dataset import create_dataloaders, SoundDataset
+from Utils.viewing import decoder
 from torch.nn import CTCLoss
 from torch.optim import AdamW
 import torch
@@ -14,7 +15,7 @@ model = Spec2Seq().to(device)
 
 EPOCHS = 1
 BATCH_SIZE = 16
-loss_fn = CTCLoss(blank=44).to(device)
+loss_fn = CTCLoss(blank=2).to(device)
 optimizer = AdamW(model.parameters(), 1e-3)
 
 ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
@@ -33,23 +34,17 @@ if __name__ == "__main__":
     from Utils.utils_dataset import int_list_to_ipa
 
 
-    audio = torch.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0001-audio.pt")
+    audio = torch.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-audio.pt").unsqueeze(0)
     audio = torch.unsqueeze(audio, 0)
     model.eval()
     model = model.to("cpu")
     with torch.no_grad():
-        pred = model(audio)
+        pred = model(audio)[0]
         print(pred.shape)
-        pred = torch.softmax(pred, -1)
-        pred = torch.argmax(pred, -1)
-        pred = torch.squeeze(pred)
-        pred = torch.unique_consecutive(pred, dim=0)
-        # pred = [i for i in pred if i != 0]
-        pred = pred.numpy()
-        print(pred)
-    pred = int_list_to_ipa(pred)
+        pred = decoder(pred)
     print(pred)
 
-    label = np.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0001-label.npy")
+    label = np.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-label.npy")
+    print(label.shape)
     print(label)
     print(int_list_to_ipa(label))

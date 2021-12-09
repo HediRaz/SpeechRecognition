@@ -1,5 +1,7 @@
 import torch
 import torch.nn.functional as F
+from Utils.viewing import decoder
+from Utils.utils_dataset import int_list_to_ipa
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -24,6 +26,11 @@ def train(dataloader, model, loss_fn, optimizer):
         optimizer.step()
 
         if batch % 10 == 0:
+            pred = pred.transpose(0, 1)
+            pred = pred[0]
+            pred = decoder(pred)
+            print(pred)
+            print(int_list_to_ipa(y[0][:ys[0]].cpu().numpy()))
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 

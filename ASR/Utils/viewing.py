@@ -1,8 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import librosa
-from utils_dataset import SoundDataset
-from utils_dataset import create_dataloaders
+from Utils.utils_dataset import int_list_to_ipa
 
 
 def plot_spectrogram(spec, title=None, ylabel='freq_bin', aspect='auto', xmax=None):
@@ -14,12 +13,13 @@ def plot_spectrogram(spec, title=None, ylabel='freq_bin', aspect='auto', xmax=No
   if xmax:
     axs.set_xlim((0, xmax))
   fig.colorbar(im, ax=axs)
-  plt.show()
 
 
+def decoder(pred):
+    pred = torch.softmax(pred, 1)
+    pred = torch.argmax(pred, 1)
+    pred = torch.unique_consecutive(pred)
+    pred = pred.to("cpu").numpy()
+    pred = int_list_to_ipa(pred)
+    return pred
 
-ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
-# train_dl, test_dl = create_dataloaders(ds, batch_size=1, split=0.8)
-for i in range(10):
-    x, y, xs, ys = ds[i]
-    print(xs, ys)
