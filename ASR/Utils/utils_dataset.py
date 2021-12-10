@@ -42,25 +42,6 @@ def yield_label_and_audio_filenames_from_raw_dataset(raw_ds_folder):
                     yield audio_filename, label, line[:length_id]
 
 
-def pad_label(label, size):
-    if label.size(0) >= size:
-        label = label[:size]
-
-    else:
-        label = pad(label, (0, size - label.size(0)), "constant", 0)
-
-    return label
-
-
-def pad_spectogram(spec, size):
-    if spec.size(1) >= size:
-        spec = spec[:, :size]
-
-    else:
-        spec = pad(spec, (0, size - spec.size(1), 0, 0), "constant", 0)
-    return spec
-
-
 def ipa_to_int_list(text):
     dict_ipa_to_int = {
         ' ': 0,
@@ -164,6 +145,77 @@ def int_list_to_ipa(l):
     return "".join([dict_int_to_ipa[c] for c in l])
 
 
+def char_to_int_list(text):
+    d = {
+        " ": 0,
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "E": 5,
+        "F": 6,
+        "G": 7,
+        "H": 8,
+        "I": 9,
+        "J": 10,
+        "K": 11,
+        "L": 12,
+        "M": 13,
+        "N": 14,
+        "O": 15,
+        "P": 16,
+        "Q": 17,
+        "R": 18,
+        "S": 19,
+        "T": 20,
+        "U": 21,
+        "V": 22,
+        "W": 23,
+        "X": 24,
+        "Y": 25,
+        "Z": 26,
+        "'": 27,
+        "": 28,
+    }
+    return [d[c] for c in text]
+
+
+def int_list_to_char(l):
+    d = {
+        " ": 0,
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "E": 5,
+        "F": 6,
+        "G": 7,
+        "H": 8,
+        "I": 9,
+        "J": 10,
+        "K": 11,
+        "L": 12,
+        "M": 13,
+        "N": 14,
+        "O": 15,
+        "P": 16,
+        "Q": 17,
+        "R": 18,
+        "S": 19,
+        "T": 20,
+        "U": 21,
+        "V": 22,
+        "W": 23,
+        "X": 24,
+        "Y": 25,
+        "Z": 26,
+        "'": 27,
+        "": 28,
+    }
+    d = dict([(a, b) for (b, a) in d.items()])
+    return "".join([d[c] for c in l])
+
+
 def create_folder_if_not_exist(folder):
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -197,24 +249,18 @@ def load_all_dataset(ds_folder):
     ds_folder = os.path.normpath(ds_folder)
     all_id = get_all_id(ds_folder)
     all_paths = list(map(lambda x: id_to_paths(ds_folder, x), all_id))
-    all_audio = [torch.load(path[0]) for path in all_paths]
+    all_audio = [torch.load(path[0]).transpose(0, 1) for path in all_paths]
     all_label = [torch.tensor(np.load(path[1]), dtype=torch.int64) for path in all_paths]
 
     # Get data size
-    all_audio_size = torch.tensor([l.size(-1) for l in all_audio], dtype=torch.long, device="cpu")
+    all_audio_size = torch.tensor([l.size(0) for l in all_audio], dtype=torch.long, device="cpu")
     all_label_size = torch.tensor([l.size(0) for l in all_label], dtype=torch.long, device="cpu")
 
     # Pad data
-    max_shape_audio = max(all_audio, key=lambda x: x.shape[1]).shape[1]
-    max_shape_label = max(all_label, key=lambda x: x.shape[0]).shape[0]
-    all_audio = [pad_spectogram(a, max_shape_audio) for a in all_audio]  # torch.nn.utils.rnn.pad_sequence(all_audio, batch_first=True).transpose(1, 2)  # [pad_spectogram(a, max_shape_audio) for a in all_audio]
-    all_label = [pad_label(a, max_shape_label) for a in all_label]  # torch.nn.utils.rnn.pad_sequence(all_label, batch_first=True, padding_value=0)  # [pad_label(a, max_shape_label) for a in all_label]
-    # print(all_audio)
-    # print(all_label)
+    all_audio = torch.nn.utils.rnn.pad_sequence(all_audio, batch_first=True).transpose(1, 2).unsqueeze(1)
+    all_label = torch.nn.utils.rnn.pad_sequence(all_label, batch_first=True, padding_value=0)
 
     # Create tensor
-    all_audio = torch.stack(all_audio, 0).unsqueeze(1)
-    all_label = torch.stack(all_label, 0)
     all_audio = all_audio.to("cpu")
     all_label = all_label.to("cpu")
 
@@ -242,8 +288,8 @@ class SoundDataset(Dataset):
         if self.training:
             audio = self.freq_masking(audio)
             audio = self.time_masking(audio)
-            rate = np.random.uniform(.9, 1.1)
-            audio = self.time_masking(audio, rate)
+            # rate = np.random.uniform(.9, 1.1)
+            # audio = self.time_stretch(audio, rate)
         return audio, self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
 
 

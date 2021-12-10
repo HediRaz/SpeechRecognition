@@ -34,13 +34,19 @@ def mel_pipeline(datapath, window_size, window_step, normalized, resample_rate=1
     nfft = window_size
 
     data = torch.squeeze(data)
-    mel_transform = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_fft=nfft, win_length=window_size, hop_length=window_step, power=2.0, normalized=normalized)
+    mel_transform = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=128)
     return mel_transform(data)
 
 
-def label_pipeline(label):
+def phonem_pipeline(label):
     label = eng_to_ipa.convert(label)
     label = utils_dataset.ipa_to_int_list(label)
+    label = np.array(label, dtype=np.uint8)
+    return label
+
+
+def char_pipeline(label):
+    label = utils_dataset.char_to_int_list(label)
     label = np.array(label, dtype=np.uint8)
     return label
 
@@ -60,8 +66,8 @@ def preproces_dataset(raw_ds_folder):
         utils_dataset.create_folder_if_not_exist(chapter_path)
 
         # process data
-        mel_spectogram = mel_pipeline(audio_filename, 25, 20, False)
-        label = label_pipeline(label)
+        mel_spectogram = spectogram_pipline(audio_filename)
+        label = char_pipeline(label)
 
         # save processed data
         spec_filename = f"{id_person}-{id_chapter}-{id_audio}-audio.pt"

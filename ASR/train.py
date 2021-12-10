@@ -1,3 +1,4 @@
+from typing import Generator
 from Neural_Network.network import AudioClassifier, Spec2Seq
 from Neural_Network.train_function import train, test
 from Utils.utils_dataset import create_dataloaders, SoundDataset
@@ -12,10 +13,12 @@ print(f"Working on {device}")
 
 # model = AudioClassifier().to(device)
 model = Spec2Seq().to(device)
+print([a.requires_grad for a in model.parameters()])
 
-EPOCHS = 1
-BATCH_SIZE = 16
-loss_fn = CTCLoss(blank=2).to(device)
+
+EPOCHS = 10
+BATCH_SIZE = 10
+loss_fn = CTCLoss(blank=28).to(device)
 optimizer = AdamW(model.parameters(), 1e-3)
 
 ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
@@ -32,6 +35,7 @@ if __name__ == "__main__":
     import torch
     import numpy as np
     from Utils.utils_dataset import int_list_to_ipa
+    from Utils.utils_dataset import int_list_to_char
 
 
     audio = torch.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-audio.pt").unsqueeze(0)
@@ -47,4 +51,4 @@ if __name__ == "__main__":
     label = np.load("Datasets/LibriSpeech/dev-clean-processed/84/121123/84-121123-0000-label.npy")
     print(label.shape)
     print(label)
-    print(int_list_to_ipa(label))
+    print(int_list_to_char(label))

@@ -1,6 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import librosa
+from Utils.utils_dataset import int_list_to_char
 from Utils.utils_dataset import int_list_to_ipa
 
 
@@ -20,6 +21,6 @@ def decoder(pred):
     pred = torch.argmax(pred, 1)
     pred = torch.unique_consecutive(pred)
     pred = pred.to("cpu").numpy()
-    pred = int_list_to_ipa(pred)
+    pred = int_list_to_char(pred)
     return pred
 

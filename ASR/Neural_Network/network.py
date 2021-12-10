@@ -104,26 +104,27 @@ class Spec2Seq(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv_layers = nn.Sequential(
-            # N x 1 x T x 128
+            # N x 1 x 201 x T
             nn.Conv2d(1, 8, 5, (1, 1)),
-            # N x 16 x (T-4) x 124
-            # MobileBlock(8),
-            # MobileBlock(8),
-            MobileBlock(8),
-            nn.Conv2d(8, 16, 3, (2, 1)),
-            # N x 16 x (T-6) x 61
+            # N x 16 x (T-4) x 198
             # nn.GELU(),
+            MobileBlock(8),
+            # MobileBlock(8),
+            # MobileBlock(8),
+            nn.Conv2d(8, 16, 3, (2, 1)),
+            # N x 16 x (T-6) x 98
+            nn.GELU(),
             # MobileBlock(16),
             # MobileBlock(16),
-            MobileBlock(16),
+            # MobileBlock(16),
             nn.Conv2d(16, 32, 3, (2, 1)),
-            # N x 32 x (T-8) x 30
+            # N x 32 x (T-8) x 48
             nn.GELU(),
             # MobileBlock(32),
             # MobileBlock(32),
             # MobileBlock(32),
             # nn.Conv2d(32, 64, 3, (2, 1)),
-            # N x 64 x (T-10) x 14
+            # N x 64 x (T-10) x 24
             # nn.ReLU(),
             # MobileBlock(64),
             # MobileBlock(64),
@@ -137,8 +138,9 @@ class Spec2Seq(nn.Module):
         )
 
         self.mlp = nn.Sequential(
-            nn.Linear(32*30, 256),
+            nn.Linear(32*48, 256),
             nn.GELU(),
+            nn.Dropout(.3),
             nn.Linear(256, 128),
             nn.GELU()
         )
@@ -147,7 +149,7 @@ class Spec2Seq(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(128, 128),
             nn.GELU(),
-            nn.Linear(128, 45)
+            nn.Linear(128, 29)
         )
 
     
