@@ -79,6 +79,7 @@ myModel = myModel.to(device)
 # Check that it is on Cuda
 next(myModel.parameters()).device
 
+
 class MobileBlock(nn.Module):
 
     def __init__(self, n):
@@ -97,6 +98,40 @@ class MobileBlock(nn.Module):
     
     def forward(self, x):
         return self.model(x) + x
+
+
+class Conformer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.feed_forward_1 = nn.Sequential(
+            nn.Linear(in_features, out_features),
+            nn.GELU()
+        )
+        self.MHA = nn.MultiheadAttention(out_features, num_heads=8, dropout=0, batch_first=True)
+        self.Convolutions = nn.Sequential(
+            nn.Conv1d(out_features, 2*out_features, 1),
+            nn.GELU(),
+            nn.Conv1d(2*out_features, 2*out_features, 3, 1, 1, 1, 2*out_features, bias=False),
+            nn.BatchNorm1d(2*out_features),
+            nn.GELU(),
+            nn.Conv1d(2*out_features, out_features, 1),
+        )
+        self.feed_forward_2 = nn.Sequential(
+            nn.Linear(out_features, out_features),
+            nn.GELU()
+        )
+
+    def forward(self, x):
+        # B T F
+        x = 0.5*self.feed_forward_1(x) + x
+        x = self.MHA(x, x, x, need_weights=False)[0] + x
+        x = x.transpose(1, 2)
+        # B F T
+        x = self.Convolutions(x) + x
+        x = x.transpose(1, 2)
+        # B T F
+        x = 0.5*self.feed_forward_2(x) + x
+        return x
 
 
 class Spec2Seq(nn.Module):
@@ -138,18 +173,21 @@ class Spec2Seq(nn.Module):
         )
 
         self.mlp = nn.Sequential(
-            nn.Linear(32*48, 256),
+            nn.Linear(32*48, 32),
             nn.GELU(),
             nn.Dropout(.3),
-            nn.Linear(256, 128),
-            nn.GELU()
+            # nn.Linear(256, 32),
+            # nn.GELU()
         )
-        self.lstm = nn.GRU(input_size=128, hidden_size=128, batch_first=True, bidirectional=True, num_layers=1)
+        # self.lstm = nn.GRU(input_size=128, hidden_size=128, batch_first=True, bidirectional=True, num_layers=1)
+        self.conformers = nn.Sequential(
+            Conformer(32, 32)
+        )
 
         self.classifier = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(32, 32),
             nn.GELU(),
-            nn.Linear(128, 29)
+            nn.Linear(32, 29)
         )
 
     
@@ -159,5 +197,6 @@ class Spec2Seq(nn.Module):
         x = torch.transpose(x, 1, 2)
         x = self.mlp(x)
         # x, _ = self.lstm(x)
+        x = self.conformers(x)
         x = self.classifier(x)
         return x
