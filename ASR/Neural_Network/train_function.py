@@ -1,50 +1,77 @@
 import torch
 import torch.nn.functional as F
-from Utils.viewing import decoder
+from Utils.viewing import greedy_decoder
 from Utils.utils_dataset import int_list_to_ipa
 from Utils.utils_dataset import int_list_to_char
+from Utils.viewing import MetricsPrint
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 
-def train(dataloader, model, loss_fn, optimizer):
+def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None):
+    # Initialize training
+    printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
+    printer.initial_print(size, name=" "*2+"Train batch"+" "*3)
     model.train()
+
     for batch, (X, y, xs, ys) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         xs, ys = xs.to(device), ys.to(device)
 
         # Compute prediction error
-        pred = model(X)
-        pred = F.log_softmax(pred, -1)
-        pred = torch.transpose(pred, 0, 1)
-        loss = loss_fn(pred, y, xs-13, ys)
+        preds = model(X)
+        preds = F.log_softmax(preds, -1)
+        preds = torch.transpose(preds, 0, 1)
+        loss = loss_fn(preds, y, xs-10, ys)
 
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
+        # Print metrics
         if batch % 30 == 0:
-            pred = pred.transpose(0, 1)
-            pred = pred[0]
-            pred = decoder(pred)
-            print(pred)
-            print(int_list_to_char(y[0][:ys[0]].cpu().numpy()))
+            preds = preds.transpose(0, 1)
+            preds = decoder(preds)
+            labels = [int_list_to_char(label) for label in y.to("cpu").numpy()]
+            metrics_values = [m(preds, labels) for m in metrics]
             loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            printer.print_loss_metrics(loss, metrics_values, current)
 
 
-def test(dataloader, model, loss_fn):
+def test(dataloader, model, loss_fn, metrics=[], decoder=None):
+    printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
+    printer.initial_print(1, name=" "*6+"Test"+" "*6)
     num_batches = len(dataloader)
     model.eval()
     test_loss = 0
+    metrics_values = [0] * len(metrics)
+
     with torch.no_grad():
-        for X, y in dataloader:
+        for batch, (X, y, xs, ys) in enumerate(dataloader):
             X, y = X.to(device), y.to(device)
-            pred = model(X)
-            test_loss += loss_fn(pred, y).item()
+            xs, ys = xs.to(device), ys.to(device)
+
+            # Compute loss
+            preds = model(X)
+            preds = F.log_softmax(preds, -1)
+            preds = torch.transpose(preds, 0, 1)
+            test_loss += loss_fn(preds, y, xs-10, ys).item()
+
+            # Compute metrics
+            preds = torch.transpose(preds, 0, 1)
+            preds = decoder(preds)
+            labels = [int_list_to_char(label) for label in y.to("cpu").numpy()]
+            for i in range(len(metrics)):
+                metrics_values[i] += metrics[i](preds, labels)
+
+    # Compute mean values
     test_loss /= num_batches
-    print(f"Test Error: Avg loss: {test_loss:>8f} \n")
+    for i in range(len(metrics)):
+        metrics_values[i] /= num_batches
+
+    # Print results
+    printer.print_loss_metrics(test_loss, metrics_values, 1)
