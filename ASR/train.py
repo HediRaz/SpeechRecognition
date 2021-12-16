@@ -5,7 +5,9 @@ from Utils.utils_dataset import create_dataloaders, SoundDataset
 from Utils.viewing import greedy_decoder, BertScoreMetric, CERMetric, WERMetric
 from torch.nn import CTCLoss
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
+import torchsummaryX
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -13,16 +15,18 @@ print(f"Working on {device}")
 
 # model = AudioClassifier().to(device)
 model = Spec2Seq().to(device)
-print([a.requires_grad for a in model.parameters()])
+torchsummaryX.summary(model, torch.zeros((10, 1, 201, 100), dtype=torch.float32, device=device))
 
 
-EPOCHS = 10
-BATCH_SIZE = 10
-loss_fn = CTCLoss(blank=28).to(device)
+EPOCHS = 100
+BATCH_SIZE = 16
+loss_fn = CTCLoss(blank=45).to(device)
 optimizer = AdamW(model.parameters(), 1e-3)
+scheduler = ReduceLROnPlateau(optimizer, 'min')
 
 metrics = [
-    CERMetric()
+    CERMetric(),
+    WERMetric()
 ]
 decoder = greedy_decoder
 
@@ -33,8 +37,8 @@ train_dl, test_dl = create_dataloaders(ds, batch_size=BATCH_SIZE, split=0.8)
 for epoch in range(1, EPOCHS+1):
     print(f"Epoch {epoch}")
     print("-"*20)
-    train(train_dl, model, loss_fn, optimizer, metrics=metrics, decoder=decoder)
-    test(test_dl, model, loss_fn, metrics, decoder)
+    train(train_dl, model, loss_fn, optimizer, metrics=metrics, decoder=decoder, scheduler=scheduler)
+    test(train_dl, model, loss_fn, metrics, decoder, scheduler=scheduler)
 
 
 if __name__ == "__main__":

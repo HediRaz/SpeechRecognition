@@ -22,7 +22,7 @@ def greedy_decoder(preds):
     preds = torch.argmax(preds, -1)
     preds = [torch.unique_consecutive(p) for p in preds]
     preds = [p.to("cpu").numpy() for p in preds]
-    preds = [int_list_to_char(p) for p in preds]
+    preds = [int_list_to_ipa(p) for p in preds]
     return preds
 
 

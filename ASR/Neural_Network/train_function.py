@@ -9,7 +9,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 
-def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None):
+def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None, scheduler=None):
     # Initialize training
     printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
@@ -35,13 +35,13 @@ def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None):
         if batch % 30 == 0:
             preds = preds.transpose(0, 1)
             preds = decoder(preds)
-            labels = [int_list_to_char(label) for label in y.to("cpu").numpy()]
+            labels = [int_list_to_ipa(label) for label in y.to("cpu").numpy()]
             metrics_values = [m(preds, labels) for m in metrics]
             loss, current = loss.item(), batch * len(X)
             printer.print_loss_metrics(loss, metrics_values, current)
 
 
-def test(dataloader, model, loss_fn, metrics=[], decoder=None):
+def test(dataloader, model, loss_fn, metrics=[], decoder=None, scheduler=None):
     printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
     printer.initial_print(1, name=" "*6+"Test"+" "*6)
@@ -64,14 +64,22 @@ def test(dataloader, model, loss_fn, metrics=[], decoder=None):
             # Compute metrics
             preds = torch.transpose(preds, 0, 1)
             preds = decoder(preds)
-            labels = [int_list_to_char(label) for label in y.to("cpu").numpy()]
+            labels = [int_list_to_ipa(label) for label in y.to("cpu").numpy()]
             for i in range(len(metrics)):
                 metrics_values[i] += metrics[i](preds, labels)
 
     # Compute mean values
     test_loss /= num_batches
+
+    if scheduler is not None:
+        scheduler.step(test_loss)
+
     for i in range(len(metrics)):
         metrics_values[i] /= num_batches
 
     # Print results
     printer.print_loss_metrics(test_loss, metrics_values, 1)
+
+    # Print samples
+    print(preds[0])
+    print(labels[0])

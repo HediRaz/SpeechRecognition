@@ -139,7 +139,8 @@ def int_list_to_ipa(l):
         'g': 41,
         'ɔ': 42,
         'x': 43,
-        't': 44
+        't': 44,
+        '': 45
     }
     dict_int_to_ipa = dict([(a, b) for (b, a) in dict_ipa_to_int.items()])
     return "".join([dict_int_to_ipa[c] for c in l])
@@ -249,6 +250,7 @@ def load_all_dataset(ds_folder):
     ds_folder = os.path.normpath(ds_folder)
     all_id = get_all_id(ds_folder)
     all_paths = list(map(lambda x: id_to_paths(ds_folder, x), all_id))
+    return all_paths
     all_audio = [torch.load(path[0]).transpose(0, 1) for path in all_paths]
     all_label = [torch.tensor(np.load(path[1]), dtype=torch.int64) for path in all_paths]
 
@@ -273,7 +275,8 @@ class SoundDataset(Dataset):
         super().__init__()
         ds_folder = os.path.normpath(ds_folder)
         self.ds_folder = ds_folder
-        self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
+        # self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
+        self.all_paths = load_all_dataset(ds_folder)
 
         self.training = False
         self.freq_masking = T.FrequencyMasking(15)
@@ -281,16 +284,35 @@ class SoundDataset(Dataset):
         self.time_stretch = T.TimeStretch()
 
     def __len__(self):
-        return self.all_label.shape[0]
+        # return self.all_label.shape[0]
+        return len(self.all_paths)
 
     def __getitem__(self, idx):
-        audio = self.all_audio[idx]
+        audio = torch.load(self.all_paths[idx][0])
+        label = np.load(self.all_paths[idx][1])
+        label = torch.tensor(label, dtype=torch.int64)
+        xs, ys = audio.size(1), label.size(0)
+        # audio = self.all_audio[idx]
         if self.training:
             audio = self.freq_masking(audio)
             audio = self.time_masking(audio)
             # rate = np.random.uniform(.9, 1.1)
             # audio = self.time_stretch(audio, rate)
-        return audio, self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
+        return audio, label, xs, ys
+        # return audio, self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
+
+
+def collate_fn(batch):
+    batch_audio = [item[0] for item in batch]
+    batch_label = [item[1] for item in batch]
+    batch_xs = [item[2] for item in batch]
+    batch_ys = [item[3] for item in batch]
+
+    batch_audio = torch.nn.utils.rnn.pad_sequence([audio.transpose(0, 1) for audio in batch_audio], batch_first=True).transpose(1, 2).unsqueeze(1)
+    batch_label = torch.nn.utils.rnn.pad_sequence([label for label in batch_label], batch_first=True)
+    batch_xs = torch.tensor(batch_xs, dtype=torch.int64)
+    batch_ys = torch.tensor(batch_ys, dtype=torch.int64)
+    return batch_audio, batch_label, batch_xs, batch_ys
 
 
 def create_dataloaders(ds, batch_size=16, split=0.8):
@@ -299,8 +321,8 @@ def create_dataloaders(ds, batch_size=16, split=0.8):
     train_ds, val_ds = random_split(ds, [n_train, n - n_train])
 
     train_ds.training = True
-    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=True)
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, pin_memory=True)
+    val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, pin_memory=True)
 
     return train_dl, val_dl
 

@@ -67,7 +67,8 @@ def preproces_dataset(raw_ds_folder):
 
         # process data
         mel_spectogram = spectogram_pipline(audio_filename)
-        label = char_pipeline(label)
+        # label = char_pipeline(label)
+        label = phonem_pipeline(label)
 
         # save processed data
         spec_filename = f"{id_person}-{id_chapter}-{id_audio}-audio.pt"
