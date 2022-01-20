@@ -1,0 +1,10 @@
+eng-to-ipa
+librosa
+matplotlib
+numpy
+scikit-learn
+scipy
+torch
+torchaudio
+torchmetrics
+torchsummaryX
