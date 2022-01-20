@@ -1,4 +1,4 @@
-import Preprocessing.preprocessing
+from Preprocessing.preprocessing import preprocess_dataset
 
 if __name__ == "__main__":
-    Preprocessing.preprocessing.preproces_dataset("Datasets/LibriSpeech/dev-clean")
+    preprocess_dataset("Datasets/LibriSpeech/dev-clean")

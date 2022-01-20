@@ -9,14 +9,17 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 
-def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None, scheduler=None):
+def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None):
+    """ Train function """
     # Initialize training
     printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
     printer.initial_print(size, name=" "*2+"Train batch"+" "*3)
     model.train()
 
+    # Iterate over the dataset
     for batch, (X, y, xs, ys) in enumerate(dataloader):
+        # Work with the GPU if available
         X, y = X.to(device), y.to(device)
         xs, ys = xs.to(device), ys.to(device)
 
@@ -42,6 +45,8 @@ def train(dataloader, model, loss_fn, optimizer, metrics=[], decoder=None, sched
 
 
 def test(dataloader, model, loss_fn, metrics=[], decoder=None, scheduler=None):
+    """ Test function """
+    # Initialize test
     printer = MetricsPrint(metrics)
     size = len(dataloader.dataset)
     printer.initial_print(1, name=" "*6+"Test"+" "*6)
@@ -51,6 +56,7 @@ def test(dataloader, model, loss_fn, metrics=[], decoder=None, scheduler=None):
     metrics_values = [0] * len(metrics)
 
     with torch.no_grad():
+        # Iterate over the test dataset
         for batch, (X, y, xs, ys) in enumerate(dataloader):
             X, y = X.to(device), y.to(device)
             xs, ys = xs.to(device), ys.to(device)
@@ -70,12 +76,12 @@ def test(dataloader, model, loss_fn, metrics=[], decoder=None, scheduler=None):
 
     # Compute mean values
     test_loss /= num_batches
-
-    if scheduler is not None:
-        scheduler.step(test_loss)
-
     for i in range(len(metrics)):
         metrics_values[i] /= num_batches
+
+    # Update de learning rate
+    if scheduler is not None:
+        scheduler.step(test_loss)
 
     # Print results
     printer.print_loss_metrics(test_loss, metrics_values, 1)

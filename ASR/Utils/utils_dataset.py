@@ -10,6 +10,18 @@ device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("
 
 
 def load_audio_file(filename, resample_rate=None):
+    """ 
+    Load an audio file
+
+    Args:
+    filename : path of the audio file
+    resample_rate (Optional) : freq we want to resample the audio
+
+    Returns:
+    waveform (Tensor): the audio
+    sample_rate (int): the sample rate
+
+    """
     waveform, sample_rate = torchaudio.load(filename)
     if resample_rate is not None:
         waveform = F.resample(waveform, sample_rate, resample_rate, resampling_method="kaiser_window")
@@ -19,9 +31,12 @@ def load_audio_file(filename, resample_rate=None):
 
 def yield_label_and_audio_filenames_from_raw_dataset(raw_ds_folder):
     """
+    Iterate over the LibriSpeech dataset and yield the audio and label path
+
+    Args;
     folder : folder path of a folder in LibriSpeech dataset
 
-    yield: audio_filename, raw label: str, id: str
+    yield: audio_filename, raw label (str), id (str)
 
     """
     # Get reader's and chapter's id
@@ -43,6 +58,7 @@ def yield_label_and_audio_filenames_from_raw_dataset(raw_ds_folder):
 
 
 def ipa_to_int_list(text):
+    """ Convert a chain of ipa character into list of int """
     dict_ipa_to_int = {
         ' ': 0,
         's': 1,
@@ -94,6 +110,7 @@ def ipa_to_int_list(text):
 
 
 def int_list_to_ipa(l):
+    """ Convert a chain of int between 0 and 45 into list of ipa character """
     dict_ipa_to_int = {
         ' ': 0,
         's': 1,
@@ -147,6 +164,7 @@ def int_list_to_ipa(l):
 
 
 def char_to_int_list(text):
+    """ Convert a chain of character into list of int """
     d = {
         " ": 0,
         "A": 1,
@@ -182,6 +200,7 @@ def char_to_int_list(text):
 
 
 def int_list_to_char(l):
+    """ Convert a chain of int between 0 and 28 into list of ipa character """
     d = {
         " ": 0,
         "A": 1,
@@ -223,10 +242,7 @@ def create_folder_if_not_exist(folder):
 
 
 def get_all_id(ds_folder):
-    """
-    Get all id of a processed dataset
-
-    """
+    """ Get all id of a processed dataset """
     all_id = []
     ds_folder = os.path.normpath(ds_folder)
     for id_person in os.listdir(ds_folder):
@@ -239,6 +255,7 @@ def get_all_id(ds_folder):
 
 
 def id_to_paths(ds_folder, id):
+    """ Given an id, return the path of the audio file and the label """
     ds_folder = os.path.normpath(ds_folder)
     id_person, id_chapter, id_audio = id.split("-")
     audio_path = os.path.join(ds_folder, id_person, id_chapter, f"{id}-audio.pt")
@@ -247,26 +264,11 @@ def id_to_paths(ds_folder, id):
 
 
 def load_all_dataset(ds_folder):
+    """ Get all audio and label path """
     ds_folder = os.path.normpath(ds_folder)
     all_id = get_all_id(ds_folder)
     all_paths = list(map(lambda x: id_to_paths(ds_folder, x), all_id))
     return all_paths
-    all_audio = [torch.load(path[0]).transpose(0, 1) for path in all_paths]
-    all_label = [torch.tensor(np.load(path[1]), dtype=torch.int64) for path in all_paths]
-
-    # Get data size
-    all_audio_size = torch.tensor([l.size(0) for l in all_audio], dtype=torch.long, device="cpu")
-    all_label_size = torch.tensor([l.size(0) for l in all_label], dtype=torch.long, device="cpu")
-
-    # Pad data
-    all_audio = torch.nn.utils.rnn.pad_sequence(all_audio, batch_first=True).transpose(1, 2).unsqueeze(1)
-    all_label = torch.nn.utils.rnn.pad_sequence(all_label, batch_first=True, padding_value=0)
-
-    # Create tensor
-    all_audio = all_audio.to("cpu")
-    all_label = all_label.to("cpu")
-
-    return all_audio, all_label, all_audio_size, all_label_size
 
 
 class SoundDataset(Dataset):
@@ -275,7 +277,6 @@ class SoundDataset(Dataset):
         super().__init__()
         ds_folder = os.path.normpath(ds_folder)
         self.ds_folder = ds_folder
-        # self.all_audio, self.all_label, self.all_audio_size, self.all_label_size = load_all_dataset(ds_folder)
         self.all_paths = load_all_dataset(ds_folder)
 
         self.training = False
@@ -284,7 +285,6 @@ class SoundDataset(Dataset):
         self.time_stretch = T.TimeStretch()
 
     def __len__(self):
-        # return self.all_label.shape[0]
         return len(self.all_paths)
 
     def __getitem__(self, idx):
@@ -292,17 +292,17 @@ class SoundDataset(Dataset):
         label = np.load(self.all_paths[idx][1])
         label = torch.tensor(label, dtype=torch.int64)
         xs, ys = audio.size(1), label.size(0)
-        # audio = self.all_audio[idx]
+
+        # Spec Augmentation
         if self.training:
             audio = self.freq_masking(audio)
             audio = self.time_masking(audio)
-            # rate = np.random.uniform(.9, 1.1)
-            # audio = self.time_stretch(audio, rate)
+
         return audio, label, xs, ys
-        # return audio, self.all_label[idx], self.all_audio_size[idx], self.all_label_size[idx]
 
 
 def collate_fn(batch):
+    """ Pad the batch """
     batch_audio = [item[0] for item in batch]
     batch_label = [item[1] for item in batch]
     batch_xs = [item[2] for item in batch]
@@ -325,13 +325,3 @@ def create_dataloaders(ds, batch_size=16, split=0.8):
     val_dl = DataLoader(val_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, pin_memory=True)
 
     return train_dl, val_dl
-
-
-
-if __name__ == "__main__":
-    ds = SoundDataset("Datasets/LibriSpeech/dev-clean-processed")
-    train_dl, test_dl = create_dataloaders(ds)
-    x = next(train_dl._get_iterator())
-    print(x[0].shape)
-    print(x[1].shape)
-    print(x[2].shape)

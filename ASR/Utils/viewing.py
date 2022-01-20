@@ -7,17 +7,19 @@ from Utils.utils_dataset import int_list_to_ipa
 
 
 def plot_spectrogram(spec, title=None, ylabel='freq_bin', aspect='auto', xmax=None):
-  fig, axs = plt.subplots(1, 1)
-  axs.set_title(title or 'Spectrogram (db)')
-  axs.set_ylabel(ylabel)
-  axs.set_xlabel('frame')
-  im = axs.imshow(librosa.power_to_db(spec), origin='lower', aspect=aspect)
-  if xmax:
-    axs.set_xlim((0, xmax))
-  fig.colorbar(im, ax=axs)
+    """ Visualization of a spectrogram """
+    fig, axs = plt.subplots(1, 1)
+    axs.set_title(title or 'Spectrogram (db)')
+    axs.set_ylabel(ylabel)
+    axs.set_xlabel('frame')
+    im = axs.imshow(librosa.power_to_db(spec), origin='lower', aspect=aspect)
+    if xmax:
+        axs.set_xlim((0, xmax))
+    fig.colorbar(im, ax=axs)
 
 
 def greedy_decoder(preds):
+    """ Decode model prediction into a sentence """
     preds = torch.softmax(preds, -1)
     preds = torch.argmax(preds, -1)
     preds = [torch.unique_consecutive(p) for p in preds]
@@ -27,6 +29,7 @@ def greedy_decoder(preds):
 
 
 class Metric():
+    """ Class to name the metrics """
     def __init__(self, name="not named"):
         self.name = name
     
@@ -63,6 +66,7 @@ class WERMetric(Metric):
 
 
 class MetricsPrint():
+    """ Class to visualize metrics during training """
     def __init__(self, metrics):
         self.metrics_names = [m.name for m in metrics]        
 
